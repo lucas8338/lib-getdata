@@ -188,6 +188,9 @@ def abs_return(df:pd.DataFrame):
     return df.apply(lambda x:abs(x.diff()))
 
 def df_sklearn_wrapper(sklfunc,df:pd.DataFrame):
+    '''
+    a function to apply sklearn.fit_transform in a dataframe and return a dataframe
+    '''
     if isinstance(df,pd.Series):
         df=df.to_frame()
     return pd.DataFrame(data=sklfunc.fit_transform(X=df),columns=df.columns,index=df.index)
