@@ -6,10 +6,6 @@ import sklearn
 import logging
 import datetime
 import matplotlib.pyplot as plt
-try:
-    import darts
-except ModuleNotFoundError:
-    logging.warn('darts module is not installed and will not imported error will happen if using a function requiring it.')
 
 def get_bars(currency:str="EURUSD",timeframe=mt5.TIMEFRAME_M15,shift_from_actual_bar:int=1,bars:int=10000,start_date:'int|datetime.datetime|None'=None,end_date:'int|datetime.datetime|None'=None):
     '''
@@ -69,9 +65,9 @@ def dataframe_transform(data,columnstoexclude:'list|None'=None,renamecolumns:'di
     transform mt5 bars response (turple) in a dataframe
     params:
     -------
-    data: the data to transform
-    columnstoexclude: list of columns to exclude
-    renamecolumns: rename the columns
+    *data: the data to transform
+    *columnstoexclude: list of columns to exclude the name needs to be BEFORE RENAMING
+    *renamecolumns: rename the columns
     '''
     data=data
     data=pd.DataFrame(data)
@@ -169,18 +165,6 @@ def list_diff(a, b):
         if i not in b:
             r.append(i)
     return r
-
-def plot_probabilistic_forecast_with_past(forecast:darts.timeseries,past_data,f_alpha:float=0.2,f_color='blue',fill_kwargs:dict={},past_kwargs={}):
-    forecast=forecast.quantiles_df().apply(lambda x:x.apply(lambda y:float(y)))
-    plt.fill_between(x=forecast[forecast.columns[0]].index,y1=forecast[forecast.columns[0]],y2=forecast[forecast.columns[-1]],color=f_color,alpha=f_alpha,**fill_kwargs)
-    plt.plot(forecast[forecast.columns[1]],color='black')
-    plt.plot(past_data,**past_kwargs)
-    
-def df_to_ts(df,**kwargs):
-    '''
-    easy dataframe to darts.timeseries
-    '''
-    return darts.timeseries.TimeSeries.from_dataframe(df=df,**kwargs)
 
 def abs_return(df:pd.DataFrame):
     if isinstance(df,pd.Series):
