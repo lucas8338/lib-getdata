@@ -6,6 +6,7 @@ import sklearn
 import logging
 import datetime
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
 def get_bars(currency:str="EURUSD",timeframe=mt5.TIMEFRAME_M15,shift_from_actual_bar:int=1,bars:int=10000,start_date:'int|datetime.datetime|None'=None,end_date:'int|datetime.datetime|None'=None):
     '''
@@ -165,6 +166,13 @@ def list_diff(a, b):
         if i not in b:
             r.append(i)
     return r
+
+def list_merge(oldlist:list,newlist:list):
+    nlist=oldlist
+    for name in newlist:
+        if not name in oldlist:
+            nlist.append(name)
+    return nlist
 
 def abs_return(df:pd.DataFrame):
     if isinstance(df,pd.Series):
