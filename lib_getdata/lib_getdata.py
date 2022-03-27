@@ -173,6 +173,17 @@ def list_merge(oldlist:list,newlist:list):
         if not name in oldlist:
             nlist.append(name)
     return nlist
+    
+def df_merge(old_df:pd.DataFrame,new_df:pd.DataFrame,update_old:bool=True,sort_index:bool=True)->pd.DataFrame:
+    ndf=pd.DataFrame(old_df)
+    if update_old is True:
+        ndf.update(new_df)
+    for index in new_df.index:
+        if not index in old_df.index:
+            ndf=ndf.append(new_df.loc[index])
+    if sort_index is True:
+        ndf=ndf.sort_index()
+    return ndf
 
 def abs_return(df:pd.DataFrame):
     if isinstance(df,pd.Series):
