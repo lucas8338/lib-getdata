@@ -7,6 +7,7 @@ import logging
 import datetime
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+from typing_extensions import Literal
 
 def get_bars(currency:str="EURUSD",timeframe=mt5.TIMEFRAME_M15,shift_from_actual_bar:int=1,bars:int=10000,start_date:'int|datetime.datetime|None'=None,end_date:'int|datetime.datetime|None'=None):
     '''
@@ -174,16 +175,27 @@ def list_merge(oldlist:list,newlist:list):
             nlist.append(name)
     return nlist
     
-def df_merge(old_df:pd.DataFrame,new_df:pd.DataFrame,update_old:bool=True,sort_index:bool=True)->pd.DataFrame:
-    ndf=pd.DataFrame(old_df)
-    if update_old is True:
-        ndf.update(new_df)
+def df_merge(old_df:pd.DataFrame,new_df:pd.DataFrame,update_old:Literal['auto','force',False]='auto',join_to_old_df:Literal['auto','always',False]='auto',sort_index:bool=True,rsuffix='_new_df')->pd.DataFrame:
+    old_df=pd.DataFrame(old_df)
+    original_old_df_columns=old_df.columns
+
+    if join_to_old_df == 'auto':
+        if not all(column in old_df.columns for column in new_df.columns):
+            old_df=old_df.join(other=new_df,rsuffix=rsuffix)
+    elif join_to_old_df == 'always':
+        old_df = old_df.join(other=new_df, rsuffix=rsuffix)
+
+    if all(column in original_old_df_columns for column in old_df.columns) and len(original_old_df_columns)==len(old_df.columns) and update_old=='auto':
+        old_df.update(new_df)
+    elif update_old=='force':
+        old_df.update(new_df)
+
     for index in new_df.index:
         if not index in old_df.index:
-            ndf=ndf.append(new_df.loc[index])
+            old_df=old_df.append(new_df.loc[index])
     if sort_index is True:
-        ndf=ndf.sort_index()
-    return ndf
+        old_df=old_df.sort_index()
+    return old_df
 
 def abs_return(df:pd.DataFrame):
     if isinstance(df,pd.Series):
