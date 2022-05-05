@@ -41,7 +41,7 @@ def get_bars(currency:str="EURUSD",timeframe=mt5.TIMEFRAME_M15,shift_from_actual
         data=mt5.copy_rates_from_pos(currency,timeframe,shift_from_actual_bar,bars)
 
     if shift_from_actual_bar+bars>200000 and timeframe!=mt5.TIMEFRAME_M1:
-        logging.warn("You are getting a big number of data, check if the data from the past data is correct the most common is the spread dont be correct with repeated spread or large value for some brokers")
+        logging.warning("You are getting a big number of data, check if the data from the past data is correct the most common is the spread dont be correct with repeated spread or large value for some brokers")
     
     if data is None:
         raise Exception("The MT5 client is not configured to download this amount of bars to solve it do: in mt5 > tools > options > charts > max bars in chart. <- increase this value or set it to unlimited.")
@@ -93,7 +93,7 @@ def split_into_samples(df,number_of_samples='auto',bars_per_sample=64,auto_cut_d
         raise Exception('the maximum number of samples is: '+str(maximum_number_of_samples))
     index_to_start=df.index.size%bars_per_sample
     if auto_cut_data==True:
-        df=df.loc[index_to_start:]
+        df=df.iloc[index_to_start:]
     samples=[]
     for i in range(number_of_samples):
         samples.append(df.iloc[bars_per_sample*i:bars_per_sample*(i+1)])
@@ -176,6 +176,10 @@ def list_merge(oldlist:list,newlist:list):
     return nlist
     
 def df_merge(old_df:pd.DataFrame,new_df:pd.DataFrame,update_old:Literal['auto','force',False]='auto',join_to_old_df:Literal['auto','always',False]='auto',sort_index:bool=True,rsuffix='_new_df')->pd.DataFrame:
+    '''
+    merge 2 dataframes and the COMMON COLUMNS WILL BE UPDATED whether both dataframes are equals (there same columns)
+    whether dataframes are differents REPEATED COLUMNS WILL BE ADDED A SUFFIX OR PREFIX
+    '''
     old_df=pd.DataFrame(old_df)
     original_old_df_columns=old_df.columns
 
@@ -196,6 +200,16 @@ def df_merge(old_df:pd.DataFrame,new_df:pd.DataFrame,update_old:Literal['auto','
     if sort_index is True:
         old_df=old_df.sort_index()
     return old_df
+
+def drop_all_repeated_columns(df:pd.DataFrame)->pd.DataFrame:
+    '''
+    drop columns that have all values repeated, incuding columns with all nans
+    '''
+    nunique = df.nunique()
+    cols_to_drop = nunique[nunique<=1].index
+    df = df.drop(cols_to_drop, axis=1)
+    return df
+
 
 def abs_return(df:pd.DataFrame):
     if isinstance(df,pd.Series):
