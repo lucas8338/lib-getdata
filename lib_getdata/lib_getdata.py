@@ -240,3 +240,7 @@ def de_stationary(df:pd.DataFrame)->pd.DataFrame:
     if isinstance(df,pd.Series):
         df=df.to_frame()
     return df.apply(func=lambda x:np.cumsum(x))
+
+def class_to_dict(clas):
+    tr={key:value for key, value in clas.__dict__.items() if not key.startswith('__') and not callable(key)}
+    return tr
