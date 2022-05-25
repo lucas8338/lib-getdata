@@ -1,13 +1,12 @@
+import bs4
 import datetime
 import logging
-import re
-import time
-
-import bs4
 import pandas as pd
+import re
 import requests
-from typing_extensions import Literal
 import swifter
+import time
+from typing_extensions import Literal
 
 class econovents:
     def __init__(self, date_start: datetime.datetime, date_end: datetime.datetime, importance: Literal[1, 2, 3], countries: 'list[str]'):
@@ -44,7 +43,7 @@ class econovents:
                 return data1.where(data1['time'].between(left=self.date_start, right=self.date_end)).dropna(how='all')
             else:
                 new_date_start = last_time-datetime.timedelta(days=1)
-                new_date_end = last_time+datetime.timedelta(weeks=32)
+                new_date_end = last_time+datetime.timedelta(days=365)
                 # will sleep by 1 second to not flooding the site
                 time.sleep(1)
                 data2 = self.economic_events(date_start=new_date_start, date_end=new_date_end, importance=self.importance,
@@ -82,7 +81,7 @@ class econovents:
                 return True if result is not None else False
 
         def _preprocess(self):
-            soup = bs4.BeautifulSoup(self.data_raw,features="lxml")
+            soup = bs4.BeautifulSoup(self.data_raw, features="lxml")
             table_all = soup.findAll(name='table', attrs={'id': 'calendar'})[0]
 
             total_size = len(table_all.findAllNext(name='thead', attrs={'class': 'table-header'}))
@@ -190,9 +189,13 @@ class uniquify:
 
         # the regex bellow will match numbers like: "usd '10.99'","usd'10.99'","'10.99'usd","'-10'usd" and others
         reg = "-{0,1}[0-9]{1,}\.{0,1}[0-9]{0,}"
-        data = data.pivot(index='time',columns=['country', 'event']).dropna(how='all', axis=1).T.drop_duplicates().T
+        data = data.pivot(index='time', columns=['country', 'event']).dropna(how='all', axis=1).T.drop_duplicates().T
         data = data.swifter.apply(
-            lambda x: x.apply(lambda y: float(max(re.findall(reg, str(y)), key=len)) if re.search(reg, str(y)) is not None else pd.NA))
+                lambda x: x.apply(lambda y: float(max(re.findall(reg, str(y)), key=len)) if re.search(reg, str(y)) is not None else pd.NA))
+        newcolumns = ['_'.join(column).replace(' ', '_').replace('.', 'dot').replace('/', 'and').replace('-', '').replace('&', 'and') for
+                      column in data.columns]
+        data.columns = data.columns.get_level_values(0)
+        data.columns = newcolumns
         self.tdf = data
 
     def get(self):
