@@ -7,6 +7,7 @@ import bs4
 import pandas as pd
 import requests
 from typing_extensions import Literal
+import swifter
 
 class econovents:
     def __init__(self, date_start: datetime.datetime, date_end: datetime.datetime, importance: Literal[1, 2, 3], countries: 'list[str]'):
@@ -81,7 +82,7 @@ class econovents:
                 return True if result is not None else False
 
         def _preprocess(self):
-            soup = bs4.BeautifulSoup(self.data_raw)
+            soup = bs4.BeautifulSoup(self.data_raw,features="lxml")
             table_all = soup.findAll(name='table', attrs={'id': 'calendar'})[0]
 
             total_size = len(table_all.findAllNext(name='thead', attrs={'class': 'table-header'}))
@@ -189,7 +190,7 @@ class uniquify:
 
         # the regex bellow will match numbers like: "usd '10.99'","usd'10.99'","'10.99'usd","'-10'usd" and others
         reg = "-{0,1}[0-9]{1,}\.{0,1}[0-9]{0,}"
-        data = data.pivot(columns=['country', 'event']).dropna(how='all', axis=1).T.drop_duplicates().T
+        data = data.pivot(index='time',columns=['country', 'event']).dropna(how='all', axis=1).T.drop_duplicates().T
         data = data.swifter.apply(
             lambda x: x.apply(lambda y: float(max(re.findall(reg, str(y)), key=len)) if re.search(reg, str(y)) is not None else pd.NA))
         self.tdf = data
