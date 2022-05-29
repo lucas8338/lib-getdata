@@ -60,11 +60,9 @@ class econovents:
 
         def _get_data(self):
             # the site return data based on the cookies setting
-            cookies = {'cal-custom-range':    f"{str(self.date_start)}|{str(self.date_end)}",
-                       'cal-timezone-offset': '0',
+            cookies = {'cal-custom-range':    f"{str(self.date_start)}|{str(self.date_end)}", 'cal-timezone-offset': '0',
                        'calendar-importance': str(self.importance),
-                       'calendar-countries':  str(self.countries).replace('[', '').replace(']', '').replace(' ', '').replace("'", ""),
-                       }
+                       'calendar-countries':  str(self.countries).replace('[', '').replace(']', '').replace(' ', '').replace("'", ""), }
             user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.67 Safari/537.36'
             req = requests.get(url='https://tradingeconomics.com/calendar', headers={'User-Agent': user_agent}, cookies=cookies,
                                verify=False)
@@ -154,9 +152,9 @@ class econovents:
                         self._reset(reset_date=False)
 
         def _make_row(self):
-            row = {'date':      self.date, 'time': self.time, 'country': self.country, 'event': self.event, 'importance': self.importance,
-                   'actual':    self.actual, 'previous': self.previous, 'revised': self.revised,
-                   'consensus': self.consensus, 'forecast': self.forecast}
+            row = {'date':     self.date, 'time': self.time, 'country': self.country, 'event': self.event, 'importance': self.importance,
+                   'actual':   self.actual, 'previous': self.previous, 'revised': self.revised, 'consensus': self.consensus,
+                   'forecast': self.forecast}
             self.rows.append(row)
             return self
 
@@ -189,7 +187,10 @@ class uniquify:
 
         # the regex bellow will match numbers like: "usd '10.99'","usd'10.99'","'10.99'usd","'-10'usd" and others
         reg = "-{0,1}[0-9]{1,}\.{0,1}[0-9]{0,}"
-        data = data.pivot(index='time', columns=['country', 'event']).dropna(how='all', axis=1).T.drop_duplicates().T
+        data = data.reset_index(drop=True)
+        data = data.dropna(how='all', axis=1).dropna(how='all', axis=0)
+        data = data.drop_duplicates().T.drop_duplicates().T
+        data = data.pivot_table(index='time', columns=['country', 'event'], aggfunc='first')
         data = data.swifter.apply(
                 lambda x: x.apply(lambda y: float(max(re.findall(reg, str(y)), key=len)) if re.search(reg, str(y)) is not None else pd.NA))
         newcolumns = ['_'.join(column).replace(' ', '_').replace('.', 'dot').replace('/', 'and').replace('-', '').replace('&', 'and') for
