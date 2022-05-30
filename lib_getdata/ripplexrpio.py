@@ -64,24 +64,26 @@ class ripplexrpio:
         block = self.latest if block is None else block
         first_block = self.get_index(index=block).index
         responses = []
-        while True:
-            ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
-            with requests_futures.sessions.FuturesSession(max_workers=100) as future:
-                for item in tqdm(ex_futures, disable=1-show_progress, desc='api_requests'):
-                    responses.append(future.get(item))
-                    # the velow value will control how many requests by second so
-                    # if the api provider is blocking this can be you are handling to many req
-                    # per second, increase this sleed time
-                    time.sleep(0.05)
-            responses = [json.loads(item.result().text) if isinstance(item, concurrent.futures.Future) else item for item in responses]
-            # this variable must return the lowest number of block in the responses
-            min_index = min([item['ledger_index'] for item in responses])
-            # this variable must to contain the time of the index returned above
-            min_index_date=self.get_index(index=min_index).index['close_time']
-            if min_index_date <= date_start.timestamp():
-                break
-            else:
-                block = min_index
+        with tqdm(total=self.get_index(block).index['close_time']-date_start.timestamp()) as progress:
+            while True:
+                ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
+                with requests_futures.sessions.FuturesSession(max_workers=100) as future:
+                    for item in tqdm(ex_futures, disable=1-show_progress, desc='api_requests'):
+                        responses.append(future.get(item))
+                        # the velow value will control how many requests by second so
+                        # if the api provider is blocking this can be you are handling to many req
+                        # per second, increase this sleed time
+                        time.sleep(0.05)
+                responses = [json.loads(item.result().text) if isinstance(item, concurrent.futures.Future) else item for item in responses]
+                # this variable must return the lowest number of block in the responses
+                min_index = min([item['ledger_index'] for item in responses])
+                # this variable must to contain the time of the index returned above
+                min_index_date=self.get_index(index=min_index).index['close_time']
+                if min_index_date <= date_start.timestamp():
+                    break
+                else:
+                    block = min_index
+                    progress.update((progress.total-(min_index_date-date_start.timestamp()))-progress.n)
         responses.insert(0, first_block)
         self.blocks = responses
         return self
