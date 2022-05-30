@@ -65,7 +65,7 @@ class ripplexrpio:
         first_block = self.get_index(index=block).index
         responses = []
         # the value called by ['close_time'] must be the time of the 'block' variable
-        with tqdm(total=self.get_index(block).index['close_time']-date_start.timestamp()) as progress:
+        with tqdm(total=self.get_index(block).index['close_time']-date_start.timestamp(),desc='Total Progress') as progress:
             while True:
                 ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
                 with requests_futures.sessions.FuturesSession(max_workers=100) as future:
