@@ -13,8 +13,8 @@ class ripplexrpio:
         '''
         class to get data from ripple (xrp), it uses the xrpscan.com api
         '''
+        # this variable needs to have the api url
         self.url = 'https://api.xrpscan.com/api/v1/ledger'
-        self.first_index = 37570
 
     def get_latest(self):
         '''
@@ -23,6 +23,7 @@ class ripplexrpio:
         '''
         latest = requests.get(url=self.url)
         latest = json.loads(latest.text)['current_ledger']
+        # self.latest must be a integer with the number of the latest block
         self.latest = latest
         return self
 
@@ -36,6 +37,9 @@ class ripplexrpio:
         session = session if session is not None else requests.session()
         data = session.get(url=f"{self.url}/{index}")
         data = json.loads(data.text)
+        # self.index must be the data of the requested index this is a json that i can use it in a
+        # pandas dataframe, be careful cause some apis return dict inside dict, to work with pandas well
+        # the dict needs not to have subdicts
         self.index = data
         return self
 
@@ -70,8 +74,11 @@ class ripplexrpio:
                     # per second, increase this sleed time
                     time.sleep(0.05)
             responses = [json.loads(item.result().text) if isinstance(item, concurrent.futures.Future) else item for item in responses]
+            # this variable must return the lowest number of block in the responses
             min_index = min([item['ledger_index'] for item in responses])
-            if self.get_index(index=min_index).index['close_time'] <= date_start.timestamp():
+            # this variable must to contain the time of the index returned above
+            min_index_date=self.get_index(index=min_index).index['close_time']
+            if min_index_date <= date_start.timestamp():
                 break
             else:
                 block = min_index
@@ -82,8 +89,10 @@ class ripplexrpio:
     def blocks_dataframe(self):
         data = self.blocks
         df = pd.DataFrame(data)
-        df = df.sort_values(by='close_time')
-        df = df.where(df['close_time'] >= self.date_start.timestamp())
+        # here must be the name of the time column
+        time_column = 'close_time'
+        df = df.sort_values(by=time_column)
+        df = df.where(df[time_column] >= self.date_start.timestamp())
         df = df.dropna(how='all')
         df = df.reset_index(drop=True)
         return df
