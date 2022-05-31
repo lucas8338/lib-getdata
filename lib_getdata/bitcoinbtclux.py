@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 engine = 'fastparquet'
 
-class ripplexrplaza():
+class bitcoinbtclux():
     def __init__(self, file, date_start, jump_distance, n_requests_by_step, checkpoint_interval: datetime.timedelta,request_interval=0.3):
         self.file = file
         self.jump_distance = jump_distance
@@ -46,7 +46,7 @@ class ripplexrplaza():
         self.past_time = np.nan if not self.past_time else self.past_time
         # bellow the variable 'self.is_forward_ok' must check with a function returning
         # the latest number of block
-        self.is_forward_ok = True if self.recently_block >= self.ripplexrpio().get_latest().latest else False
+        self.is_forward_ok = True if self.recently_block >= self.api_wrapper().get_latest().latest else False
         self.is_backward_ok = True if self.past_time <= self.target_date_start.timestamp() else False
         return self
 
@@ -55,7 +55,7 @@ class ripplexrplaza():
         date_start = datetime.datetime.utcfromtimestamp(self.past_time) if self.df is not None else self.date_now
         date_start = date_start-self.checkpoint_interval
 
-        data = self.ripplexrpio().get(block=block,
+        data = self.api_wrapper().get(block=block,
                                       date_start=date_start, jump_distance=self.jump_distance,
                                       n_requests_by_step=self.n_requests_by_step,request_interval=self.request_interval)
         for column in data.columns:
@@ -65,7 +65,7 @@ class ripplexrplaza():
         return self
 
     def _forward(self):
-        data = self.ripplexrpio().get(block=None, date_start=datetime.datetime.fromtimestamp(self.recently_time),
+        data = self.api_wrapper().get(block=None, date_start=datetime.datetime.fromtimestamp(self.recently_time),
                                       jump_distance=self.jump_distance,
                                       n_requests_by_step=self.n_requests_by_step,request_interval=self.request_interval)
         data = self.df.append(other=data, ignore_index=True)
@@ -84,7 +84,7 @@ class ripplexrplaza():
                 break
         return self.df
 
-    class ripplexrpio:
+    class api_wrapper:
         def __init__(self):
             '''
             class to get data from ripple (xrp), it uses the xrpscan.com api
