@@ -1,24 +1,25 @@
 import concurrent.futures
 import datetime
 import json
-import time
 import os
-import numpy as np
+import time
 
+import numpy as np
 import pandas as pd
 import requests
 import requests_futures.sessions
 from tqdm import tqdm
 
-engine='fastparquet'
+engine = 'fastparquet'
 
 class ripplexrplaza():
-    def __init__(self, file,date_start, jump_distance, n_requests_by_step, checkpoint_interval: datetime.timedelta):
+    def __init__(self, file, date_start, jump_distance, n_requests_by_step, checkpoint_interval: datetime.timedelta):
         self.file = file
         self.jump_distance = jump_distance
         self.n_requests_by_step = n_requests_by_step
         self.checkpoint_interval = checkpoint_interval
         self.target_date_start = date_start
+        self.date_now = datetime.datetime.utcnow()
         # bellow variables must be changed to work with others api's
         # self.time_column is the name of column containing the timestamp
         self.time_column = 'close_time'
@@ -33,15 +34,15 @@ class ripplexrplaza():
         return self
 
     def _check_marks(self):
-        self.recently_block = self.df[self.block_column].max() if self.df is not None else None
+        self.recently_block = self.df[self.block_column].max() if self.df is not None else np.nan
         self.recently_time = self.df[self.time_column].max() if self.df is not None else None
         self.past_block = self.df[self.block_column].min() if self.df is not None else None
         self.past_time = self.df[self.time_column].min() if self.df is not None else None
         return self
 
     def _check_already_ok(self):
-        self.recently_time=np.nan if not self.recently_time else self.recently_time
-        self.past_time=np.nan if not self.past_time else self.past_time
+        self.recently_time = np.nan if not self.recently_time else self.recently_time
+        self.past_time = np.nan if not self.past_time else self.past_time
         # bellow the variable 'self.is_forward_ok' must check with a function returning
         # the latest number of block
         self.is_forward_ok = True if self.recently_block >= self.ripplexrpio().get_latest().latest else False
@@ -50,27 +51,37 @@ class ripplexrplaza():
 
     def _backward(self):
         block = None if self.df is None else self.past_block
-        date_start=datetime.datetime.utcfromtimestamp(self.past_time)
+        date_start = datetime.datetime.utcfromtimestamp(self.past_time) if self.df is not None else self.date_now
         date_start = date_start-self.checkpoint_interval
 
         data = self.ripplexrpio().get(block=block,
-                                                date_start=date_start, jump_distance=self.jump_distance,
-                                                n_requests_by_step=self.n_requests_by_step)
+                                      date_start=date_start, jump_distance=self.jump_distance,
+                                      n_requests_by_step=self.n_requests_by_step)
         for column in data.columns:
             data[column] = pd.to_numeric(data[column], errors='ignore')
-        data=self.df.append(other=data,ignore_index=True) if self.df is not None else data
+        data = self.df.append(other=data, ignore_index=True) if self.df is not None else data
+        data.to_parquet(path=self.file, engine=engine)
+        return self
+
+    def _forward(self):
+        data = self.ripplexrpio().get(block=None, date_start=datetime.datetime.fromtimestamp(self.recently_time),
+                                      jump_distance=self.jump_distance,
+                                      n_requests_by_step=self.n_requests_by_step)
+        data = self.df.append(other=data, ignore_index=True)
         data.to_parquet(path=self.file, engine=engine)
         return self
 
     def get(self):
+        self._get_already_data()._check_marks()._check_already_ok()
+        if self.df is not None:
+            self._forward()
         while True:
-            self._get_already_data()._check_marks()._check_already_ok()
             if not self.is_backward_ok:
+                self._get_already_data()._check_marks()._check_already_ok()
                 self._backward()
             else:
                 break
         return self.df
-
 
     class ripplexrpio:
         def __init__(self):
@@ -79,6 +90,10 @@ class ripplexrplaza():
             '''
             # this variable needs to have the api url
             self.url = 'https://api.xrpscan.com/api/v1/ledger'
+            # must contain the string of the timestamp
+            self.time_column = 'close_time'
+            # must contain the number of the block
+            self.block_column = 'ledger_index'
 
         def get_latest(self):
             '''
@@ -107,7 +122,8 @@ class ripplexrplaza():
             self.index = data
             return self
 
-        def get_blocks(self, date_start: datetime.datetime, jump_distance, n_request_by_step, block: int = None, show_progress: bool = True):
+        def get_blocks(self, date_start: datetime.datetime, jump_distance, n_request_by_step, block: int = None,
+                       show_progress: bool = True):
             '''
             function to get the blocks this will iterate to get all data
             :param date_start: is the date what i spect dataframe starts
@@ -128,8 +144,8 @@ class ripplexrplaza():
             block = self.latest if block is None else block
             first_block = self.get_index(index=block).index
             responses = []
-            # the value called by ['close_time'] must be the time of the 'block' variable
-            with tqdm(total=self.get_index(block).index['close_time']-date_start.timestamp(),desc='Total Progress') as progress:
+            # the value called by [self.time_column] must be the time of the 'block' variable
+            with tqdm(total=self.get_index(block).index[self.time_column]-date_start.timestamp(), desc='Total Progress') as progress:
                 while True:
                     ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
                     with requests_futures.sessions.FuturesSession(max_workers=100) as future:
@@ -140,24 +156,24 @@ class ripplexrplaza():
                             # per second, increase this sleed time
                             time.sleep(0.1)
 
-                    concurrent.futures.wait([item for item in responses if isinstance(item,concurrent.futures.Future)],timeout=5)
-                    post_responses=[]
+                    concurrent.futures.wait([item for item in responses if isinstance(item, concurrent.futures.Future)], timeout=5)
+                    post_responses = []
                     for item in responses:
-                        result=item.result() if isinstance(item,concurrent.futures.Future) else item
-                        stats=result.stats if isinstance(result,concurrent.futures.Future) else 200
+                        result = item.result() if isinstance(item, concurrent.futures.Future) else item
+                        stats = result.stats if isinstance(result, concurrent.futures.Future) else 200
                         if stats!=200:
                             raise Exception(f"Server returned an error: {stats}")
                         try:
-                            resultdict=json.loads(result.text) if not isinstance(result,dict) else result
+                            resultdict = json.loads(result.text) if not isinstance(result, dict) else result
                             post_responses.append(resultdict)
                         except:
                             pass
-                    responses=post_responses
+                    responses = post_responses
 
                     # this variable must return the lowest number of block in the responses
-                    min_index = min([item['ledger_index'] for item in responses])
+                    min_index = min([item[self.block_column] for item in responses])
                     # this variable must to contain the time of the index returned above
-                    min_index_date=self.get_index(index=min_index).index['close_time']
+                    min_index_date = self.get_index(index=min_index).index[self.time_column]
                     if min_index_date <= date_start.timestamp():
                         break
                     else:
@@ -171,10 +187,9 @@ class ripplexrplaza():
             data = self.blocks
             df = pd.DataFrame(data)
             # here must be the name of the time column
-            time_column = 'close_time'
+            time_column = self.time_column
             df = df.sort_values(by=time_column)
-            df = df.where(df[time_column] >= self.date_start.timestamp())
-            df = df.dropna(how='all')
+            df = df.where(df[time_column] > self.date_start.timestamp()).dropna(how='all')
             df = df.reset_index(drop=True)
             return df
 
