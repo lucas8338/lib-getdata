@@ -13,18 +13,19 @@ from tqdm import tqdm
 engine = 'fastparquet'
 
 class ripplexrplaza():
-    def __init__(self, file, date_start, jump_distance, n_requests_by_step, checkpoint_interval: datetime.timedelta, request_interval=0.1):
+    def __init__(self, file, date_start, jump_distance, n_requests_by_step, checkpoint_interval: datetime.timedelta,request_interval=0.3):
         self.file = file
         self.jump_distance = jump_distance
         self.n_requests_by_step = n_requests_by_step
         self.checkpoint_interval = checkpoint_interval
         self.target_date_start = date_start
         self.date_now = datetime.datetime.utcnow()
+        self.request_interval=request_interval
         # bellow variables must be changed to work with others api's
         # self.time_column is the name of column containing the timestamp
-        self.time_column = 'close_time'
+        self.time_column = 'time'
         # self.block_column is the name of column containing the number of block
-        self.block_column = 'ledger_index'
+        self.block_column = 'height'
 
     def _get_already_data(self):
         if os.path.isfile(self.file):
@@ -56,7 +57,7 @@ class ripplexrplaza():
 
         data = self.ripplexrpio().get(block=block,
                                       date_start=date_start, jump_distance=self.jump_distance,
-                                      n_requests_by_step=self.n_requests_by_step)
+                                      n_requests_by_step=self.n_requests_by_step,request_interval=self.request_interval)
         for column in data.columns:
             data[column] = pd.to_numeric(data[column], errors='ignore')
         data = self.df.append(other=data, ignore_index=True) if self.df is not None else data
@@ -66,7 +67,7 @@ class ripplexrplaza():
     def _forward(self):
         data = self.ripplexrpio().get(block=None, date_start=datetime.datetime.fromtimestamp(self.recently_time),
                                       jump_distance=self.jump_distance,
-                                      n_requests_by_step=self.n_requests_by_step)
+                                      n_requests_by_step=self.n_requests_by_step,request_interval=self.request_interval)
         data = self.df.append(other=data, ignore_index=True)
         data.to_parquet(path=self.file, engine=engine)
         return self
@@ -89,11 +90,11 @@ class ripplexrplaza():
             class to get data from ripple (xrp), it uses the xrpscan.com api
             '''
             # this variable needs to have the api url
-            self.url = 'https://api.xrpscan.com/api/v1/ledger'
+            self.url = 'https://api.bitcore.io/api/BTC/mainnet/block/'
             # must contain the string of the timestamp
-            self.time_column = 'close_time'
+            self.time_column = 'time'
             # must contain the number of the block
-            self.block_column = 'ledger_index'
+            self.block_column = 'height'
 
         def get_latest(self):
             '''
@@ -101,7 +102,7 @@ class ripplexrplaza():
             :return: self or int (the number of the latest block) on '.latest'
             '''
             latest = requests.get(url=self.url)
-            latest = json.loads(latest.text)['current_ledger']
+            latest = json.loads(latest.text)[0][self.block_column]
             # self.latest must be a integer with the number of the latest block
             self.latest = latest
             return self
@@ -122,8 +123,15 @@ class ripplexrplaza():
             self.index = data
             return self
 
+        def _strtotimestamp(self, s):
+            format = "%Y-%m-%dT%H:%M:%S"
+            s = s.replace(".000Z", "")
+            data = datetime.datetime.strptime(s, format).replace(tzinfo=datetime.timezone.utc)
+            data = data.timestamp()
+            return data
+
         def get_blocks(self, date_start: datetime.datetime, jump_distance, n_request_by_step, block: int = None,
-                       show_progress: bool = True, request_interval=0.1):
+                       show_progress: bool = True,request_interval=0.3):
             '''
             function to get the blocks this will iterate to get all data
             :param date_start: is the date what i spect dataframe starts
@@ -142,10 +150,12 @@ class ripplexrplaza():
             self.date_start = date_start
             datas_blocks = []
             block = self.latest if block is None else block
+            block = int(block)
             first_block = self.get_index(index=block).index
             responses = []
             # the value called by [self.time_column] must be the time of the 'block' variable
-            with tqdm(total=self.get_index(block).index[self.time_column]-date_start.timestamp(), desc='Total Progress') as progress:
+            with tqdm(total=(self._strtotimestamp(self.get_index(block).index[self.time_column]))-date_start.timestamp(),
+                      desc='Total Progress') as progress:
                 while True:
                     ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
                     with requests_futures.sessions.FuturesSession(max_workers=100) as future:
@@ -173,7 +183,7 @@ class ripplexrplaza():
                     # this variable must return the lowest number of block in the responses
                     min_index = min([item[self.block_column] for item in responses])
                     # this variable must to contain the time of the index returned above
-                    min_index_date = self.get_index(index=min_index).index[self.time_column]
+                    min_index_date = self._strtotimestamp(self.get_index(index=min_index).index[self.time_column])
                     if min_index_date <= date_start.timestamp():
                         break
                     else:
@@ -189,13 +199,13 @@ class ripplexrplaza():
             # here must be the name of the time column
             time_column = self.time_column
             df = df.sort_values(by=time_column)
+            df[time_column] = df[time_column].apply(lambda x: self._strtotimestamp(x))
             df = df.where(df[time_column] > self.date_start.timestamp()).dropna(how='all')
             df = df.reset_index(drop=True)
             return df
 
         def get(self, date_start: datetime.datetime, jump_distance: int, n_requests_by_step: int, block: 'None|int' = None,
-                show_progress: bool = True, request_interval=0.1) -> pd.DataFrame:
+                show_progress: bool = True,request_interval=0.3) -> pd.DataFrame:
             data = self.get_latest().get_blocks(date_start=date_start, jump_distance=jump_distance, n_request_by_step=n_requests_by_step,
-                                                block=block, show_progress=show_progress,
-                                                request_interval=request_interval).blocks_dataframe()
+                                                block=block, show_progress=show_progress,request_interval=request_interval).blocks_dataframe()
             return data
