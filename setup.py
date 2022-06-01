@@ -1,7 +1,7 @@
 from setuptools import setup,find_packages
 
 setup(name='lib_getdata',
-      version='3.2.0',
+      version='3.2.1',
       description='general purpose library to manipulate data',
       author='Lucas Monteiro',
       author_email='lucas.ma8338@gmail.com',
