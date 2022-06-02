@@ -66,6 +66,8 @@ class ripplexrplaza():
         for column in data.columns:
             data[column] = pd.to_numeric(data[column], errors='ignore')
         data = self.df.append(other=data, ignore_index=True).drop_duplicates() if self.df is not None else data
+        # line to fix maxsize error
+        data = data.apply(lambda x: x.astype(np.float64,errors='ignore'))
         data.to_parquet(path=self.file, engine=engine)
         return self
 
@@ -75,6 +77,8 @@ class ripplexrplaza():
                                  n_requests_by_step=self.n_requests_by_step, request_interval=self.request_interval,
                                  show_progress=self.show_progress)
         data = self.df.append(other=data, ignore_index=True).drop_duplicates()
+        # line to fix a error of maxsize int
+        data=data.apply(lambda x:x.astype(np.float64,errors='ignore'))
         data.to_parquet(path=self.file, engine=engine)
         return self
 
@@ -153,7 +157,7 @@ class api_wrapper:
         # the value called by [self.time_column] must be the time of the 'block' variable
         with tqdm(total=self.get_index(block).index[self.time_column]-date_start.timestamp(), desc='Total Progress') as progress:
             while True:
-                ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
+                ex_futures = [f"{self.url}/{int(block-jump_distance*(1+n_request))}" for n_request in range(n_request_by_step)]
                 with requests_futures.sessions.FuturesSession(max_workers=100) as future:
                     for item in tqdm(ex_futures, disable=1-show_progress, desc='api_requests'):
                         responses.append(future.get(item))
@@ -169,7 +173,12 @@ class api_wrapper:
                     result = item.result() if isinstance(item, concurrent.futures.Future) else item
                     stats = result.status_code if not isinstance(result, dict) else 200
                     if stats!=200:
-                        raise Exception(f"Server returned an error: {stats}")
+                        raise Exception(f"Server returned an error: {stats}\n"
+                                        f"result: {result}\n"
+                                        f"result type: {type(result)}\n"
+                                        f"item: {item}\n"
+                                        f"item type: {type(item)}\n"
+                                        f"url: {result.request.url}")
                     resultdict = json.loads(result.text) if not isinstance(result, dict) else result
                     post_responses.append(resultdict)
                 responses = post_responses
