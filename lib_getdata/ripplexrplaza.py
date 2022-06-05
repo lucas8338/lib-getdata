@@ -39,9 +39,9 @@ class ripplexrplaza():
 
     def _check_marks(self):
         self.recently_block = self.df[self.block_column].max() if self.df is not None else np.nan
-        self.recently_time = self.df[self.time_column].max() if self.df is not None else None
+        self.recently_time = self.df.index.max().timestamp() if self.df is not None else None
         self.past_block = self.df[self.block_column].min() if self.df is not None else None
-        self.past_time = self.df[self.time_column].min() if self.df is not None else None
+        self.past_time = self.df.index.min().timestamp() if self.df is not None else None
         return self
 
     def _check_already_ok(self):
@@ -62,10 +62,12 @@ class ripplexrplaza():
                                  date_start=date_start, jump_distance=self.jump_distance,
                                  n_requests_by_step=self.n_requests_by_step, show_progress=self.show_progress,
                                  request_interval=self.request_interval)
+        data=data.set_index(keys=self.time_column)
+        data.index=pd.to_datetime(data.index,unit='s')
         # try to transform all columns into numeric
         for column in data.columns:
             data[column] = pd.to_numeric(data[column], errors='ignore')
-        data = self.df.append(other=data, ignore_index=True).drop_duplicates() if self.df is not None else data
+        data = self.df.append(other=data) if self.df is not None else data
         # line to fix maxsize error
         data = data.apply(lambda x: x.astype(np.float64,errors='ignore'))
         data.to_parquet(path=self.file, engine=engine)
@@ -76,7 +78,9 @@ class ripplexrplaza():
                                  jump_distance=self.jump_distance,
                                  n_requests_by_step=self.n_requests_by_step, request_interval=self.request_interval,
                                  show_progress=self.show_progress)
-        data = self.df.append(other=data, ignore_index=True).drop_duplicates()
+        data = data.set_index(keys=self.time_column)
+        data.index = pd.to_datetime(data.index, unit='s')
+        data = self.df.append(other=data)
         # line to fix a error of maxsize int
         data=data.apply(lambda x:x.astype(np.float64,errors='ignore'))
         data.to_parquet(path=self.file, engine=engine)

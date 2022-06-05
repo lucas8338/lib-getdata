@@ -7,6 +7,8 @@ import pandas as pd
 import sklearn
 import sklearn.model_selection as sklms
 from typing_extensions import Literal
+from numba import jit,njit
+import tqdm
 
 def get_bars(currency: str = "EURUSD", timeframe=mt5.TIMEFRAME_M15, shift_from_actual_bar: int = 1, bars: int = 10000,
              start_date: 'int|datetime.datetime|None' = None, end_date: 'int|datetime.datetime|None' = None):
@@ -248,3 +250,48 @@ def de_stationary(df: pd.DataFrame) -> pd.DataFrame:
 def class_to_dict(clas):
     tr = {key: value for key, value in clas.__dict__.items() if not key.startswith('__') and not callable(key)}
     return tr
+
+class numpy:
+
+    def rolling_apply(data: np.ndarray, window: int, func,progress:bool=True):
+        '''
+        does a rolling on a numpy array, as on 'pandas.series.rolling'
+        '''
+        data = np.copy(data)
+        _selector=np.copy(data)
+        window=window-1
+        for i in tqdm.tqdm(range(window,len(data)),desc='rolling_apply',disable=1-progress):
+            data[i]=func(_selector[i-window:i])
+        data[:window]=None
+        return data
+
+
+    def expanding_apply(data: np.ndarray,func,min_periods: int=0,progress:bool=True):
+        data=np.copy(data)
+        _selector=np.copy(data)
+        for i in tqdm.tqdm(range(min_periods,len(data)),desc='expanding_apply',disable=1-progress):
+            data[i]=func(_selector[:i])
+        data[:min_periods]=None
+        return data
+
+    def pct_change(data:np.ndarray):
+        func=lambda x:(x[-2]-x[-1])/x[-1]
+        return numpy.expanding_apply(data,func=func,min_periods=2)
+
+    def ewma(data, window):
+        data=np.copy(data)
+
+        alpha = 2/(window+1.0)
+        alpha_rev = 1-alpha
+        n = data.shape[0]
+
+        pows = alpha_rev**(np.arange(n+1))
+
+        scale_arr = 1/pows[:-1]
+        offset = data[0]*pows[1:]
+        pw0 = alpha*alpha_rev**(n-1)
+
+        mult = data*pw0*scale_arr
+        cumsums = mult.cumsum()
+        out = offset+cumsums*scale_arr[::-1]
+        return out
