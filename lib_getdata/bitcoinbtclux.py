@@ -68,6 +68,7 @@ class bitcoinbtclux():
         for column in data.columns:
             data[column] = pd.to_numeric(data[column], errors='ignore')
         data = self.df.append(other=data) if self.df is not None else data
+        data = data[~data.index.duplicated()]
         data.to_parquet(path=self.file, engine=engine)
         return self
 
@@ -79,6 +80,7 @@ class bitcoinbtclux():
         data = data.set_index(keys=self.time_column)
         data.index = pd.to_datetime(data.index, unit='s')
         data = self.df.append(other=data)
+        data = data[~data.index.duplicated()]
         data.to_parquet(path=self.file, engine=engine)
         return self
 

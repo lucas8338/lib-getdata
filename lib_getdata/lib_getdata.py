@@ -259,7 +259,7 @@ class numpy:
         data = np.copy(data)
         _selector = np.copy(data)
         window = window-1
-        for i in tqdm.tqdm(range(window, len(data)), desc='rolling_apply', disable=1-progress):
+        for i in tqdm.tqdm(range(window, len(data)), desc='rolling_apply', disable=1-progress,leave=False):
             data[i] = func(_selector[i-window:i])
         data[:window] = None
         return data
@@ -267,7 +267,7 @@ class numpy:
     def expanding_apply(data: np.ndarray, func, min_periods: int = 0, progress: bool = True):
         data = np.copy(data)
         _selector = np.copy(data)
-        for i in tqdm.tqdm(range(min_periods, len(data)), desc='expanding_apply', disable=1-progress):
+        for i in tqdm.tqdm(range(min_periods, len(data)), desc='expanding_apply', disable=1-progress,leave=False):
             data[i] = func(_selector[:i])
         data[:min_periods] = None
         return data

@@ -70,6 +70,7 @@ class ripplexrplaza():
         data = self.df.append(other=data) if self.df is not None else data
         # line to fix maxsize error
         data = data.apply(lambda x: x.astype(np.float64,errors='ignore'))
+        data = data[~data.index.duplicated()]
         data.to_parquet(path=self.file, engine=engine)
         return self
 
@@ -83,6 +84,7 @@ class ripplexrplaza():
         data = self.df.append(other=data)
         # line to fix a error of maxsize int
         data=data.apply(lambda x:x.astype(np.float64,errors='ignore'))
+        data = data[~data.index.duplicated()]
         data.to_parquet(path=self.file, engine=engine)
         return self
 
