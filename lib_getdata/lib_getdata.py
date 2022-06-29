@@ -29,7 +29,7 @@ def get_bars(currency: str = "EURUSD", timeframe=mt5.TIMEFRAME_M15, shift_from_a
     if not mt5.initialize():
         logging.error('fail to mt5.initialize()')
     if not mt5.symbol_select(currency, True):
-        logging.error("was not possible to add the currency to the market watch")
+        logging.error(f"was not possible to add the currency: {currency} to the market watch")
 
     if start_date is not None or end_date is not None:
         logging.info("start_date or end_date is not None so using the function mt5.copy_rates_range(...)")
