@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 
 import MetaTrader5 as mt5
 import numpy as np
@@ -40,9 +41,11 @@ def get_bars(currency: str = "EURUSD", timeframe=mt5.TIMEFRAME_M15, shift_from_a
         if isinstance(end_date, datetime.datetime):
             logging.info('end_date is a datetime.datetime so converting it to timestamp seconds...')
             end_date = to_timestamp_s(end_date)
-        data = mt5.copy_rates_range(currency, timeframe, start_date, end_date)
+        for _ in range(3):
+            data = mt5.copy_rates_range(currency, timeframe, start_date, end_date)
     elif start_date is None and end_date is None:
-        data = mt5.copy_rates_from_pos(currency, timeframe, shift_from_actual_bar, bars)
+        for _ in range(3):
+            data = mt5.copy_rates_from_pos(currency, timeframe, shift_from_actual_bar, bars)
 
     if shift_from_actual_bar+bars > 200000 and timeframe!=mt5.TIMEFRAME_M1:
         logging.warning(
@@ -285,6 +288,17 @@ class numpy:
         func = lambda x: (x[-2]-x[-1])/x[-1]
         return numpy.expanding_apply(data, func=func, min_periods=2)
 
+    def hhistogram(data, bins: int):
+        """
+        'h'histogram means human histogram, cause numpy return a value i dont know what is that on x axis
+        so this correct this, y,x=np.histogram(...); x=x[:-1]
+        :return : (x,y)
+        """
+        y, x = np.histogram(a=data, bins=bins)
+        x = x[:-1]
+        assert len(x)==len(y)
+        return (x, y)
+
     class feature_engineering:
         class feature_transformation:
             def logrp1(data: np.ndarray):
@@ -441,3 +455,64 @@ class pandas:
                     df_result[column] = pd.Series(results, index=list(range(1, maxlag+1)))
                 df_result.index.name='lag'
                 return df_result
+
+    class standardScaler:
+        def __init__(self,df:pd.DataFrame,file=None,verbose=True,force_fit=False):
+            """
+            :param file: a location to save a 'csv' file
+            """
+            if isinstance(df,pd.Series):
+                df=df.to_frame()
+            self.df=df
+            self.file=file
+            self.verbose=verbose
+            self.force_fit=force_fit
+            if os.path.isfile(self.file):
+                self.is_fitted=True
+            else:
+                self.is_fitted=False
+
+        def fit(self) -> None:
+            if os.path.isfile(self.file) and self.force_fit is False:
+                raise Exception(f"you called fit but in your file folder there a file, so whether you "
+                                "want to fit anyway you need to set 'force_fit=True'")
+            scaler_df = pd.DataFrame()
+            for column in tqdm.tqdm(self.df.columns,desc='fitting scaler',disable=1-self.verbose):
+                mean = self.df[column].mean()
+                stddev = self.df[column].std()
+                scaler_df[column] = pd.Series([mean, stddev], index=['mean', 'stddev'])
+            scaler_df.lib_getdata=True
+            scaler_df.is_fitted=True
+            self.scaler=scaler_df
+            self.scaler.to_csv(self.file)
+            return self
+
+        def transform(self) -> pd.DataFrame:
+            scaler=pd.read_csv(self.file,index_col=0)
+            assert sorted(scaler.columns.tolist())==sorted(self.df.columns.tolist()),f"dataframe there columns was not present in the"\
+                "fitted dataframe"
+            for column in tqdm.tqdm(self.df.columns,desc='applying scaling',disable=1-self.verbose):
+                mean=scaler[column].loc['mean']
+                stddev=scaler[column].loc['stddev']
+                self.df[column]=self.df[column].apply(lambda x:(x-mean)/stddev)
+            return self.df
+
+    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True):
+        """
+        this function split the dataframe into a x and y to fit machine learning like tensorflow models
+        remember the data will be still list of dataframe is needed to convert them to numpy
+        """
+        sequence_size = input_size+output_size
+        if df.iloc[df.index.size%sequence_size]!=0:
+            if auto_resize is False:
+                raise ValueError("the data is not divisible by {sequence_size} the data length needs to be divisible by that value"
+                                 "you can set parameter 'auto_resize=True' to the algo remove the pasts data from the dataframe")
+            else:
+                data = df.iloc[df.index.size%sequence_size:]
+        x = []
+        y = []
+        num_sequences = int(df.index.size/sequence_size)
+        for i in range(num_sequences):
+            x.append(df.iloc[sequence_size*i:sequence_size*i+input_size])
+            y.append(df.iloc[sequence_size*i+input_size:sequence_size*(i+1)])
+        return (x,y)
