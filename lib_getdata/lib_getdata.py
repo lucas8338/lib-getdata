@@ -503,16 +503,18 @@ class pandas:
         remember the data will be still list of dataframe is needed to convert them to numpy
         """
         sequence_size = input_size+output_size
-        if df.iloc[df.index.size%sequence_size]!=0:
+        if df.index.size%sequence_size!=0:
             if auto_resize is False:
                 raise ValueError("the data is not divisible by {sequence_size} the data length needs to be divisible by that value"
                                  "you can set parameter 'auto_resize=True' to the algo remove the pasts data from the dataframe")
             else:
-                data = df.iloc[df.index.size%sequence_size:]
+                df = df.iloc[df.index.size%sequence_size:]
         x = []
         y = []
         num_sequences = int(df.index.size/sequence_size)
-        for i in range(num_sequences):
-            x.append(df.iloc[sequence_size*i:sequence_size*i+input_size])
-            y.append(df.iloc[sequence_size*i+input_size:sequence_size*(i+1)])
+        assert df.index.size%sequence_size==0, f"the size of data is not divisible by the sequence_length (input_size+output_size): {sequence_size}"
+        for i in range(df.index.size-sequence_size+1):
+            visible=df.iloc[i:sequence_size+i]
+            x.append(visible.iloc[:input_size])
+            y.append(visible.iloc[input_size:])
         return (x,y)
