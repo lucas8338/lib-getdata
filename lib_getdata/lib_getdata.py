@@ -497,7 +497,7 @@ class pandas:
                 self.df[column]=self.df[column].apply(lambda x:(x-mean)/stddev)
             return self.df
 
-    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True):
+    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True,progress=True):
         """
         this function split the dataframe into a x and y to fit machine learning like tensorflow models
         remember the data will be still list of dataframe is needed to convert them to numpy
@@ -513,7 +513,7 @@ class pandas:
         y = []
         num_sequences = int(df.index.size/sequence_size)
         assert df.index.size%sequence_size==0, f"the size of data is not divisible by the sequence_length (input_size+output_size): {sequence_size}"
-        for i in range(df.index.size-sequence_size+1):
+        for i in tqdm.tqdm(range(df.index.size-sequence_size+1),desc='timeseries_from_pandas',disable=1-progress):
             visible=df.iloc[i:sequence_size+i]
             x.append(visible.iloc[:input_size])
             y.append(visible.iloc[input_size:])
