@@ -466,7 +466,7 @@ class pandas:
                 def fit(self,df):
                     df=df.copy()
                     self.model=pd.DataFrame(index=["min","max"])
-                    for column in df:
+                    for column in df.columns:
                         min=df[column].min()
                         max=df[column].max()
                         self.model[column]=[min,max]
