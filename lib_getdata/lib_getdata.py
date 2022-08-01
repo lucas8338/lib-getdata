@@ -12,6 +12,7 @@ import scipy.signal
 import tqdm
 from typing import Literal
 import statsmodels.tsa.stattools
+import joblib
 
 def get_bars(currency: str = "EURUSD", timeframe=mt5.TIMEFRAME_M15, shift_from_actual_bar: int = 1, bars: int = 10000,
              start_date: 'int|datetime.datetime|None' = None, end_date: 'int|datetime.datetime|None' = None):
@@ -443,6 +444,7 @@ class pandas:
     class feature_engineering:
         class feature_selection:
             def grangercausalitytest(df, endog_column, maxlag) -> pd.DataFrame:
+                df=df.copy()
                 for column in df.columns:
                     assert df[column].nunique()>1,f"the column '{column}' is constant, granger raises an error whether value is constant"
                 df_result = pd.DataFrame()
@@ -456,52 +458,46 @@ class pandas:
                 df_result.index.name='lag'
                 return df_result
 
-    class standardScaler:
-        def __init__(self,df:pd.DataFrame,file=None,verbose=True,force_fit=False):
-            """
-            :param file: a location to save a 'csv' file
-            """
-            if isinstance(df,pd.Series):
-                df=df.to_frame()
-            self.df=df
-            self.file=file
-            self.verbose=verbose
-            self.force_fit=force_fit
-            if os.path.isfile(self.file):
-                self.is_fitted=True
-            else:
-                self.is_fitted=False
+        class scaler:
+            class min_max:
+                def __init__(self,df):
+                    self.df=df
 
-        def fit(self) -> None:
-            if os.path.isfile(self.file) and self.force_fit is False:
-                raise Exception(f"you called fit but in your file folder there a file, so whether you "
-                                "want to fit anyway you need to set 'force_fit=True'")
-            scaler_df = pd.DataFrame()
-            for column in tqdm.tqdm(self.df.columns,desc='fitting scaler',disable=1-self.verbose):
-                mean = self.df[column].mean()
-                stddev = self.df[column].std()
-                scaler_df[column] = pd.Series([mean, stddev], index=['mean', 'stddev'])
-            scaler_df.lib_getdata=True
-            scaler_df.is_fitted=True
-            self.scaler=scaler_df
-            self.scaler.to_csv(self.file)
-            return self
+                def fit(self):
+                    self.model=pd.DataFrame(index=["min","max"])
+                    for column in self.df:
+                        min=self.df[column].min()
+                        max=self.df[column].max()
+                        self.model[column]=[min,max]
+                        self.model[column].loc['min']=min
+                        self.model[column].loc['max']=max
+                    return self
 
-        def transform(self) -> pd.DataFrame:
-            scaler=pd.read_csv(self.file,index_col=0)
-            assert sorted(scaler.columns.tolist())==sorted(self.df.columns.tolist()),f"dataframe there columns was not present in the"\
-                "fitted dataframe"
-            for column in tqdm.tqdm(self.df.columns,desc='applying scaling',disable=1-self.verbose):
-                mean=scaler[column].loc['mean']
-                stddev=scaler[column].loc['stddev']
-                self.df[column]=self.df[column].apply(lambda x:(x-mean)/stddev)
-            return self.df
+                def load(self,model):
+                    '''
+                    model is a dataframe containig the min and max (as rows) for each column
+                    '''
+                    self.model=model
+                    return self
 
-    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True,progress=True):
+                def transform(self,df):
+                    df=df.copy()
+                    for column in self.model.columns:
+                        if not column in df.columns:
+                            raise Exception(f"the column: '{column}', was present in the data when it was fitted but not is presend to transoform")
+
+                    for column in self.model.columns:
+                        min=self.model[column].loc['min']
+                        max=self.model[column].loc['max']
+                        df[column]=df[column].apply(lambda x: (x-min)/(max-min))
+                    return df
+
+    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True,n_jobs=-1,progress=True):
         """
         this function split the dataframe into a x and y to fit machine learning like tensorflow models
         remember the data will be still list of dataframe is needed to convert them to numpy
         """
+        df=df.copy()
         sequence_size = input_size+output_size
         if df.index.size%sequence_size!=0:
             if auto_resize is False:
@@ -509,12 +505,15 @@ class pandas:
                                  "you can set parameter 'auto_resize=True' to the algo remove the pasts data from the dataframe")
             else:
                 df = df.iloc[df.index.size%sequence_size:]
+        iters=range(df.index.size-sequence_size+1)
         x = []
         y = []
-        num_sequences = int(df.index.size/sequence_size)
         assert df.index.size%sequence_size==0, f"the size of data is not divisible by the sequence_length (input_size+output_size): {sequence_size}"
-        for i in tqdm.tqdm(range(df.index.size-sequence_size+1),desc='timeseries_from_pandas',disable=1-progress):
-            visible=df.iloc[i:sequence_size+i]
+        def process(i):
+            visible = df.iloc[i:sequence_size+i]
             x.append(visible.iloc[:input_size])
             y.append(visible.iloc[input_size:])
+        joblib.Parallel(n_jobs=n_jobs,backend='threading',verbose=progress)(joblib.delayed(process)(i) for i in iters)
+        assert x[0].index[0]==df.index[0]
+        assert y[-1].index[-1]==df.index[-1], "the last data of the y data is not the last data of the data"
         return (x,y)

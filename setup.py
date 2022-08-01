@@ -1,11 +1,11 @@
 from setuptools import setup,find_packages
 
 setup(name='lib_getdata',
-      version='3.4.0',
+      version='4.0.0',
       description='general purpose library to manipulate data',
       author='Lucas Monteiro',
       author_email='lucas.ma8338@gmail.com',
       url='https://github.com/lucas8338/lib-getdata',
       packages=find_packages(),
-      requires=['pandas','numpy','MetaTrader5','sklearn'],
+      requires=['pandas','numpy','MetaTrader5','sklearn','scipy','tqdm','statsmodels','joblib'],
      )
