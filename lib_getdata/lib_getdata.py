@@ -493,7 +493,7 @@ class pandas:
                         df[column]=df[column].apply(lambda x: (x-min)/(max-min))
                     return df
 
-    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True,n_jobs=-1,progress=True):
+    def timeseries_from_pandas(df,input_size,output_size,auto_resize=True,progress=True):
         """
         this function split the dataframe into a x and y to fit machine learning like tensorflow models
         remember the data will be still list of dataframe is needed to convert them to numpy
@@ -514,7 +514,8 @@ class pandas:
             visible = df.iloc[i:sequence_size+i]
             x.append(visible.iloc[:input_size])
             y.append(visible.iloc[input_size:])
-        joblib.Parallel(n_jobs=n_jobs,backend='threading',verbose=progress)(joblib.delayed(process)(i) for i in iters)
+        for i in tqdm.tqdm(iters,desc='timeseries_from_pandas',disable=1-progress):
+            process(i)
         assert x[0].index[0]==df.index[0]
         assert y[-1].index[-1]==df.index[-1], "the last data of the y data is not the last data of the data"
         return (x,y)
