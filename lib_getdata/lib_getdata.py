@@ -460,14 +460,15 @@ class pandas:
 
         class scaler:
             class min_max:
-                def __init__(self,df):
-                    self.df=df
+                def __init__(self):
+                    pass
 
-                def fit(self):
+                def fit(self,df):
+                    df=df.copy()
                     self.model=pd.DataFrame(index=["min","max"])
-                    for column in self.df:
-                        min=self.df[column].min()
-                        max=self.df[column].max()
+                    for column in df:
+                        min=df[column].min()
+                        max=df[column].max()
                         self.model[column]=[min,max]
                         self.model[column].loc['min']=min
                         self.model[column].loc['max']=max
