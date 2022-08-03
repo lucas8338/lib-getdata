@@ -6,8 +6,6 @@ import lib_getdata as gd
 import pandas as pd
 import pytrends.request
 
-import config
-
 class gtreology():
     def __init__(self, pyt: pytrends.request.TrendReq, db_file: str, data_to_mount: dict, date_start: datetime, date_end: datetime = None,
                  sleep=0.2):
@@ -101,4 +99,3 @@ class gtreology():
                 db.to_parquet(path=self.db_file, index=True, engine='fastparquet')
                 logging.info(f"update of data '{item}' in group: '{key}' has been completed.")
         logging.info('db update completed.')
-

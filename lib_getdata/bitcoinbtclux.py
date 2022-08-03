@@ -164,7 +164,8 @@ class api_wrapper:
         first_block = self.get_index(index=block).index
         responses = []
         # the value called by [self.time_column] must be the time of the 'block' variable
-        with tqdm(total=self._strToTimestamp(self.get_index(block).index[self.time_column])-date_start.timestamp(), desc='Total Progress') as progress:
+        with tqdm(total=self._strToTimestamp(self.get_index(block).index[self.time_column])-date_start.timestamp(),
+                  desc='Total Progress') as progress:
             while True:
                 ex_futures = [f"{self.url}/{block-jump_distance*(1+n_request)}" for n_request in range(n_request_by_step)]
                 with requests_futures.sessions.FuturesSession(max_workers=100) as future:
@@ -205,7 +206,7 @@ class api_wrapper:
         df = pd.DataFrame(data)
         # here must be the name of the time column
         time_column = self.time_column
-        df[time_column]=df[time_column].apply(lambda x:self._strToTimestamp(x))
+        df[time_column] = df[time_column].apply(lambda x: self._strToTimestamp(x))
         df = df.sort_values(by=time_column)
         df = df.dropna(how='all')
         df = df.reset_index(drop=True)

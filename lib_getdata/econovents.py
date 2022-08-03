@@ -1,12 +1,13 @@
-import bs4
 import datetime
 import logging
-import pandas as pd
 import re
-import requests
-import swifter
 import time
-from typing_extensions import Literal
+from typing import Literal
+
+import bs4
+
+import pandas as pd
+import requests
 
 class econovents:
     def __init__(self, date_start: datetime.datetime, date_end: datetime.datetime, importance: Literal[1, 2, 3], countries: 'list[str]'):
